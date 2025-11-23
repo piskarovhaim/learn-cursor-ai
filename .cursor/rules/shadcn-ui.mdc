@@ -1,0 +1,42 @@
+---
+alwaysApply: true
+description: Guidelines for using shadcn UI components in the project
+---
+
+# shadcn UI Component Guidelines
+
+This project uses **shadcn UI** for all UI elements.
+
+## Initialization
+
+If shadcn UI is not initialized in the project, use:
+
+```bash
+npx shadcn@latest init
+```
+
+## Adding Components
+
+To install a specific component, use the following command format:
+
+```bash
+npx shadcn@latest add <component-name>
+```
+
+### Examples:
+- Button: `npx shadcn@latest add button`
+- Card: `npx shadcn@latest add card`
+- Dialog: `npx shadcn@latest add dialog`
+- Input: `npx shadcn@latest add input`
+- Form: `npx shadcn@latest add form`
+
+## Best Practices
+
+1. **Always use shadcn UI components** - Do not create custom UI components from scratch when shadcn UI provides an equivalent
+2. **Check if component exists** - Before creating any UI element, verify if shadcn UI has a pre-built component
+3. **Install before use** - Always ensure the required component is installed before importing it in your code
+4. **Follow shadcn conventions** - Use the components as documented in the shadcn UI documentation
+
+## Component Location
+
+After installation, shadcn UI components are typically located in `src/components/ui/` directory.
