@@ -1,0 +1,214 @@
+---
+alwaysApply: true
+---
+# Authentication & Data Access Security
+
+**All authentication is handled by Clerk. Users must ONLY access their own data.**
+
+## Authentication Setup
+
+- Authentication middleware: [src/middleware.ts](mdc:src/middleware.ts) - Clerk handles all auth
+- User context: Use `auth()` from `@clerk/nextjs` to get current user
+- Protected routes: All routes are protected by Clerk middleware except public routes
+
+## Critical Security Requirements
+
+### ✅ ALWAYS Filter by User ID
+
+Every database query that accesses user data MUST filter by the authenticated user's ID.
+
+```typescript
+import { auth } from '@clerk/nextjs';
+import { db } from '@/db';
+import { decksTable, cardsTable } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
+
+// ✅ CORRECT - Always filter by userId
+const { userId } = await auth();
+if (!userId) throw new Error('Unauthorized');
+
+const userDecks = await db.select()
+  .from(decksTable)
+  .where(eq(decksTable.userId, userId));
+
+// ✅ CORRECT - Filter by both ID and userId for specific resources
+const deck = await db.select()
+  .from(decksTable)
+  .where(and(
+    eq(decksTable.id, deckId),
+    eq(decksTable.userId, userId)
+  ));
+
+// ✅ CORRECT - Verify ownership before updates/deletes
+const [deckToUpdate] = await db.select()
+  .from(decksTable)
+  .where(and(
+    eq(decksTable.id, deckId),
+    eq(decksTable.userId, userId)
+  ));
+
+if (!deckToUpdate) {
+  throw new Error('Deck not found or unauthorized');
+}
+
+await db.update(decksTable)
+  .set({ name: 'New Name', updatedAt: new Date() })
+  .where(and(
+    eq(decksTable.id, deckId),
+    eq(decksTable.userId, userId)
+  ));
+```
+
+### ❌ NEVER Query Without User Filter
+
+```typescript
+// ❌ DANGEROUS - No user filter, exposes all users' data
+const allDecks = await db.select().from(decksTable);
+
+// ❌ DANGEROUS - Only filtering by ID, not userId
+const deck = await db.select()
+  .from(decksTable)
+  .where(eq(decksTable.id, deckId));
+
+// ❌ DANGEROUS - Update without verifying ownership
+await db.update(decksTable)
+  .set({ name: 'Hacked!' })
+  .where(eq(decksTable.id, deckId));
+
+// ❌ DANGEROUS - Delete without checking userId
+await db.delete(cardsTable)
+  .where(eq(cardsTable.id, cardId));
+```
+
+## API Route Protection Pattern
+
+Every API route must:
+1. Get the authenticated user with `auth()`
+2. Check if `userId` exists
+3. Filter ALL database queries by `userId`
+
+```typescript
+import { auth } from '@clerk/nextjs';
+import { NextResponse } from 'next/server';
+
+export async function GET() {
+  // Step 1 & 2: Get and verify user
+  const { userId } = await auth();
+  
+  if (!userId) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+
+  // Step 3: Query with userId filter
+  const data = await db.select()
+    .from(decksTable)
+    .where(eq(decksTable.userId, userId));
+
+  return NextResponse.json(data);
+}
+```
+
+## Server Actions Protection
+
+All Server Actions must follow the same pattern:
+
+```typescript
+'use server';
+
+import { auth } from '@clerk/nextjs';
+import { db } from '@/db';
+import { decksTable } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
+
+export async function updateDeck(deckId: number, name: string) {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // Always verify ownership before mutation
+  const [deck] = await db.select()
+    .from(decksTable)
+    .where(and(
+      eq(decksTable.id, deckId),
+      eq(decksTable.userId, userId)
+    ));
+
+  if (!deck) {
+    throw new Error('Deck not found or unauthorized');
+  }
+
+  await db.update(decksTable)
+    .set({ name, updatedAt: new Date() })
+    .where(and(
+      eq(decksTable.id, deckId),
+      eq(decksTable.userId, userId)
+    ));
+}
+```
+
+## Relational Queries
+
+When using Drizzle's relational queries, ensure the root query filters by userId:
+
+```typescript
+// ✅ CORRECT - Root query filters by userId
+const { userId } = await auth();
+if (!userId) throw new Error('Unauthorized');
+
+const decksWithCards = await db.query.decksTable.findMany({
+  where: eq(decksTable.userId, userId),
+  with: {
+    cards: true
+  }
+});
+
+// ✅ CORRECT - Single resource with userId filter
+const deck = await db.query.decksTable.findFirst({
+  where: and(
+    eq(decksTable.id, deckId),
+    eq(decksTable.userId, userId)
+  ),
+  with: {
+    cards: true
+  }
+});
+```
+
+## Schema Requirements
+
+All user-owned tables in [src/db/schema.ts](mdc:src/db/schema.ts) must have a `userId` field:
+
+```typescript
+// ✅ CORRECT - userId field present
+export const decksTable = pgTable('decks', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull(), // Required for access control
+  name: text('name').notNull(),
+  // ... other fields
+});
+```
+
+## Zero Trust Principle
+
+**Never trust client input for authorization decisions.**
+
+- Always get `userId` from `auth()` on the server
+- Never accept `userId` as a parameter from the client
+- Always verify ownership before operations
+- Use database constraints (foreign keys) to maintain data integrity
+
+## Quick Checklist
+
+Before any database operation, ask:
+1. ✓ Did I call `auth()` to get the userId?
+2. ✓ Did I check if userId exists?
+3. ✓ Did I filter the query by userId?
+4. ✓ For updates/deletes, did I verify ownership first?
+5. ✓ Am I never accepting userId from client input?
+
+**If you answer "no" to any of these, the code is vulnerable.**

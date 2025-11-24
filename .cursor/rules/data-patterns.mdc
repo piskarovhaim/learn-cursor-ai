@@ -1,0 +1,320 @@
+---
+alwaysApply: true
+---
+# Data Handling Patterns
+
+**All data operations must follow these strict patterns for consistency and type safety.**
+
+## Data Retrieval
+
+**All data fetching must be done in Server Components.**
+
+### ✅ Correct - Server Component data fetching
+
+```typescript
+// app/dashboard/page.tsx (Server Component)
+import { auth } from '@clerk/nextjs';
+import { db } from '@/db';
+import { decksTable } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+
+export default async function DashboardPage() {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // Fetch data directly in the Server Component
+  const decks = await db.select()
+    .from(decksTable)
+    .where(eq(decksTable.userId, userId));
+
+  return (
+    <div>
+      {decks.map(deck => (
+        <div key={deck.id}>{deck.name}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+### ❌ Incorrect - Do NOT fetch in Client Components or API routes for display
+
+```typescript
+// ❌ Never fetch data in Client Components
+'use client';
+
+export default function DashboardPage() {
+  const [decks, setDecks] = useState([]);
+  
+  useEffect(() => {
+    fetch('/api/decks').then(/* ... */); // ❌ Wrong pattern
+  }, []);
+}
+
+// ❌ Don't create API routes just to fetch data for display
+// app/api/decks/route.ts
+export async function GET() {
+  const decks = await db.select().from(decksTable);
+  return NextResponse.json(decks);
+}
+```
+
+## Data Mutations
+
+**All database mutations (INSERT, UPDATE, DELETE) must be done via Server Actions.**
+
+### ✅ Correct - Server Actions for mutations
+
+```typescript
+// actions/deck-actions.ts
+'use server';
+
+import { auth } from '@clerk/nextjs';
+import { db } from '@/db';
+import { decksTable } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
+import { z } from 'zod';
+
+// Define Zod schema
+const createDeckSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100),
+  description: z.string().max(500).optional(),
+});
+
+// Define TypeScript type from schema
+type CreateDeckInput = z.infer<typeof createDeckSchema>;
+
+export async function createDeck(input: CreateDeckInput) {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // Validate input with Zod
+  const validatedInput = createDeckSchema.parse(input);
+
+  const [newDeck] = await db.insert(decksTable)
+    .values({
+      userId,
+      name: validatedInput.name,
+      description: validatedInput.description,
+    })
+    .returning();
+
+  return newDeck;
+}
+
+// Update action
+const updateDeckSchema = z.object({
+  id: z.number(),
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+});
+
+type UpdateDeckInput = z.infer<typeof updateDeckSchema>;
+
+export async function updateDeck(input: UpdateDeckInput) {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const validatedInput = updateDeckSchema.parse(input);
+
+  // Verify ownership
+  const [deck] = await db.select()
+    .from(decksTable)
+    .where(and(
+      eq(decksTable.id, validatedInput.id),
+      eq(decksTable.userId, userId)
+    ));
+
+  if (!deck) {
+    throw new Error('Deck not found or unauthorized');
+  }
+
+  await db.update(decksTable)
+    .set({
+      name: validatedInput.name,
+      description: validatedInput.description,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(decksTable.id, validatedInput.id),
+      eq(decksTable.userId, userId)
+    ));
+}
+
+// Delete action
+const deleteDeckSchema = z.object({
+  id: z.number(),
+});
+
+type DeleteDeckInput = z.infer<typeof deleteDeckSchema>;
+
+export async function deleteDeck(input: DeleteDeckInput) {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const validatedInput = deleteDeckSchema.parse(input);
+
+  // Verify ownership before deletion
+  const [deck] = await db.select()
+    .from(decksTable)
+    .where(and(
+      eq(decksTable.id, validatedInput.id),
+      eq(decksTable.userId, userId)
+    ));
+
+  if (!deck) {
+    throw new Error('Deck not found or unauthorized');
+  }
+
+  await db.delete(decksTable)
+    .where(and(
+      eq(decksTable.id, validatedInput.id),
+      eq(decksTable.userId, userId)
+    ));
+}
+```
+
+### ✅ Correct - Using Server Actions in Client Components
+
+```typescript
+'use client';
+
+import { createDeck } from '@/actions/deck-actions';
+import { useState } from 'react';
+
+export function CreateDeckForm() {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      // Call server action with typed object
+      await createDeck({
+        name,
+        description,
+      });
+      
+      // Handle success
+      setName('');
+      setDescription('');
+    } catch (error) {
+      // Handle error (Zod validation or other errors)
+      console.error(error);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Deck name"
+      />
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Description"
+      />
+      <button type="submit">Create Deck</button>
+    </form>
+  );
+}
+```
+
+### ❌ Incorrect - Do NOT use these patterns
+
+```typescript
+// ❌ Never use FormData as the parameter type
+export async function createDeck(formData: FormData) {
+  const name = formData.get('name'); // ❌ No type safety
+  // ...
+}
+
+// ❌ Never skip Zod validation
+export async function createDeck(input: CreateDeckInput) {
+  // Missing: const validatedInput = createDeckSchema.parse(input);
+  await db.insert(decksTable).values(input); // ❌ Unvalidated input
+}
+
+// ❌ Never use API routes for mutations
+// app/api/decks/route.ts
+export async function POST(request: Request) {
+  const body = await request.json();
+  await db.insert(decksTable).values(body); // ❌ Wrong pattern
+}
+
+// ❌ Never mutate database in Client Components
+'use client';
+export function CreateDeckForm() {
+  const handleSubmit = async () => {
+    await db.insert(decksTable).values(/* ... */); // ❌ Cannot do this
+  };
+}
+
+// ❌ Never accept untyped parameters
+export async function createDeck(input: any) { // ❌ Use proper TypeScript types
+  // ...
+}
+```
+
+## Zod Validation Requirements
+
+**All Server Action inputs must be validated with Zod.**
+
+### Pattern for Server Actions:
+
+1. Define Zod schema for input validation
+2. Infer TypeScript type from schema using `z.infer<>`
+3. Use the inferred type for the function parameter
+4. Parse/validate input with `schema.parse()` at the start of the action
+5. Use the validated data for database operations
+
+```typescript
+// 1. Define schema
+const myActionSchema = z.object({
+  field: z.string().min(1),
+});
+
+// 2. Infer type
+type MyActionInput = z.infer<typeof myActionSchema>;
+
+// 3. Use type in function
+export async function myAction(input: MyActionInput) {
+  // 4. Validate
+  const validatedInput = myActionSchema.parse(input);
+  
+  // 5. Use validated data
+  await db.insert(table).values(validatedInput);
+}
+```
+
+## Quick Checklist
+
+### For Data Retrieval:
+1. ✓ Am I fetching in a Server Component?
+2. ✓ Am I NOT creating an API route just for data display?
+3. ✓ Am I following auth security rules (filtering by userId)?
+
+### For Data Mutations:
+1. ✓ Is this a Server Action (marked with 'use server')?
+2. ✓ Did I define a Zod schema?
+3. ✓ Did I infer a TypeScript type from the schema?
+4. ✓ Did I use the inferred type (NOT `any`, NOT `FormData`)?
+5. ✓ Did I validate with `schema.parse()` before using the data?
+6. ✓ Am I following auth security rules (checking userId)?
+
+**If you answer "no" to any of these, the code is incorrect.**

@@ -1,0 +1,87 @@
+---
+alwaysApply: true
+description: Database interaction guidelines using Drizzle ORM
+---
+
+# Database Interactions
+
+**All database interactions must use Drizzle ORM schema and queries.**
+
+## Database Setup
+
+- Database client: [src/db/index.ts](mdc:src/db/index.ts) - exports the `db` instance
+- Schema definitions: [src/db/schema.ts](mdc:src/db/schema.ts) - contains all table definitions and relations
+- Configuration: [drizzle.config.ts](mdc:drizzle.config.ts) - Drizzle Kit configuration
+
+## Available Tables
+
+From [src/db/schema.ts](mdc:src/db/schema.ts):
+- `decksTable` - User flashcard decks
+- `cardsTable` - Individual flashcards within decks
+
+Relations are defined for efficient querying with `decksRelations` and `cardsRelations`.
+
+## Usage Guidelines
+
+### ✅ Correct - Use Drizzle queries
+
+```typescript
+import { db } from '@/db';
+import { decksTable, cardsTable } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
+
+// Query examples
+const userDecks = await db.select().from(decksTable).where(eq(decksTable.userId, userId));
+const deck = await db.select().from(decksTable).where(eq(decksTable.id, deckId));
+
+// Insert examples
+const newDeck = await db.insert(decksTable).values({
+  userId,
+  name: 'My Deck',
+  description: 'Learning Spanish'
+}).returning();
+
+// Update examples
+await db.update(decksTable)
+  .set({ name: 'Updated Name', updatedAt: new Date() })
+  .where(eq(decksTable.id, deckId));
+
+// Delete examples
+await db.delete(cardsTable).where(eq(cardsTable.deckId, deckId));
+
+// Relational queries
+const decksWithCards = await db.query.decksTable.findMany({
+  where: eq(decksTable.userId, userId),
+  with: {
+    cards: true
+  }
+});
+```
+
+### ❌ Incorrect - Do NOT use raw SQL or other ORMs
+
+```typescript
+// ❌ Never do this
+const result = await db.execute('SELECT * FROM decks WHERE user_id = $1', [userId]);
+
+// ❌ Never bypass the schema
+const result = await fetch('/api/direct-db-query');
+
+// ❌ Never use raw SQL strings
+const query = 'INSERT INTO decks ...';
+```
+
+## Key Principles
+
+1. **Always import from schema**: Use table definitions from [src/db/schema.ts](mdc:src/db/schema.ts)
+2. **Use type-safe queries**: Leverage Drizzle's type safety
+3. **Use relations**: Utilize defined relations for joins and nested queries
+4. **Import db instance**: Always use the `db` instance from [src/db/index.ts](mdc:src/db/index.ts)
+5. **Use Drizzle operators**: Import operators like `eq`, `and`, `or`, `like` from `drizzle-orm`
+
+## Migrations
+
+- Schema changes should be made in [src/db/schema.ts](mdc:src/db/schema.ts)
+- Run `npx drizzle-kit generate` to create migrations
+- Run `npx drizzle-kit migrate` to apply migrations
+- Configuration is in [drizzle.config.ts](mdc:drizzle.config.ts)
