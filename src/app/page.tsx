@@ -1,10 +1,13 @@
-import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
-import { Button } from "@/components/ui/button";
+import { redirect } from "next/navigation";
 import { AuthButtons } from "@/components/auth-buttons";
 
 export default async function Home() {
   const { userId } = await auth();
+
+  if (userId) {
+    redirect("/dashboard");
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-white dark:bg-black">
@@ -18,13 +21,7 @@ export default async function Home() {
           </p>
         </div>
         <div className="flex flex-col gap-4 sm:flex-row">
-          {userId ? (
-            <Button asChild>
-              <Link href="/dashboard">Go to Dashboard</Link>
-            </Button>
-          ) : (
-            <AuthButtons />
-          )}
+          <AuthButtons />
         </div>
       </main>
     </div>

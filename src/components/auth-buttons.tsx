@@ -26,7 +26,11 @@ export function AuthButtons() {
               Sign in to your account to continue
             </DialogDescription>
           </DialogHeader>
-          <SignIn routing="virtual" />
+          <SignIn 
+            routing="virtual"
+            afterSignInUrl="/dashboard"
+            afterSignUpUrl="/dashboard"
+          />
         </DialogContent>
       </Dialog>
 
@@ -42,7 +46,11 @@ export function AuthButtons() {
               Create a new account to get started
             </DialogDescription>
           </DialogHeader>
-          <SignUp routing="virtual" />
+          <SignUp 
+            routing="virtual"
+            afterSignInUrl="/dashboard"
+            afterSignUpUrl="/dashboard"
+          />
         </DialogContent>
       </Dialog>
     </div>

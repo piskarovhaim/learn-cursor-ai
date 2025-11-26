@@ -68,6 +68,69 @@ npx shadcn@latest add <component-name>
 
 After installation, shadcn UI components are located in `src/components/ui/` directory.
 
+## Icons with shadcn UI
+
+**All icons MUST use Lucide React, which is the standard icon library for shadcn UI projects.**
+
+### ✅ Correct - Using Lucide React Icons
+
+```typescript
+import { Shuffle, Plus, Edit, Trash2, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+export function MyComponent() {
+  return (
+    <div className="flex gap-2">
+      <Button variant="outline" size="sm">
+        <Shuffle className="mr-2 h-4 w-4" />
+        Shuffle
+      </Button>
+      
+      <Button>
+        <Plus className="mr-2 h-4 w-4" />
+        Add Item
+      </Button>
+    </div>
+  );
+}
+```
+
+### Icon Sizing Guidelines
+
+- **Small buttons (`size="sm"`)**: Use `h-4 w-4` (16px)
+- **Default buttons**: Use `h-4 w-4` or `h-5 w-5` (16px-20px)
+- **Large buttons (`size="lg"`)**: Use `h-5 w-5` or `h-6 w-6` (20px-24px)
+- **Spacing**: Use `mr-2` (8px) for icons before text, `ml-2` for icons after text
+
+### ❌ WRONG - Do NOT use emojis or other icon libraries
+
+```typescript
+// ❌ FORBIDDEN - Using emojis instead of icons
+<Button>
+  🔀 Shuffle
+</Button>
+
+// ❌ FORBIDDEN - Using other icon libraries
+import { FaShuffle } from 'react-icons/fa';
+import { Icon } from '@iconify/react';
+
+// ❌ FORBIDDEN - Using SVG files directly
+import ShuffleIcon from '@/icons/shuffle.svg';
+```
+
+### Finding Icons
+
+Browse available icons at: https://lucide.dev/icons/
+
+Common icons used in the project:
+- `Shuffle` - For shuffle/randomize actions
+- `Plus` - For add/create actions
+- `Edit` / `Pencil` - For edit actions
+- `Trash2` - For delete actions
+- `ArrowLeft` / `ArrowRight` - For navigation
+- `X` - For close/dismiss actions
+- `Check` - For confirm/success actions
+
 ## Clerk Integration with shadcn UI
 
 **All Clerk authentication UI MUST use shadcn UI components.**
@@ -213,7 +276,8 @@ Before writing ANY UI code, verify:
 1. ✓ Am I using a shadcn UI component?
 2. ✓ Have I installed the required shadcn UI component?
 3. ✓ Am I NOT creating any custom buttons, inputs, or other UI primitives?
-4. ✓ If using Clerk, am I using shadcn UI Button and Dialog components?
-5. ✓ Am I NOT using raw HTML elements for interactive UI?
+4. ✓ If using icons, am I using Lucide React (NOT emojis or other icon libraries)?
+5. ✓ If using Clerk, am I using shadcn UI Button and Dialog components?
+6. ✓ Am I NOT using raw HTML elements for interactive UI?
 
 **If you answer "no" to any of these, STOP and use shadcn UI instead.**

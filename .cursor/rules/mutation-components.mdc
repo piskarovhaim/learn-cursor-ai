@@ -1,0 +1,392 @@
+---
+alwaysApply: true
+---
+# Mutation Components Structure
+
+**All add/edit/delete functionality MUST follow this exact structure for consistency and maintainability.**
+
+## Architecture Overview
+
+**CRITICAL**: Every add/edit/delete operation must be split into separate, reusable components following this structure:
+
+1. **Action Component** - Client component with UI (dialog/form)
+2. **Server Action** - Server-side validation and mutation logic in [src/actions/](mdc:src/actions/)
+3. **Query Helper** - Database operations in [src/db/queries/](mdc:src/db/queries/)
+
+## Component Structure
+
+### ✅ Required Pattern - Action Components
+
+**Each action (add/edit/delete) MUST be a separate component file.**
+
+#### Naming Convention
+- Add: `Add{Entity}Button` (e.g., `AddCardButton`, `AddDeckButton`)
+- Edit: `Edit{Entity}Button` (e.g., `EditCardButton`, `EditDeckButton`)
+- Delete: `Delete{Entity}Button` (e.g., `DeleteCardButton`, `DeleteDeckButton`)
+
+#### Component Location
+- Action components MUST be in the same directory as the entity they operate on
+- Example: Card actions in `src/app/decks/components/add-card-button.tsx`, `edit-card-button.tsx`
+- Export from `index.ts` in the same directory
+
+#### Component Structure Template
+
+```typescript
+'use client';
+
+import { useState, useEffect } from 'react'; // useEffect only for edit components
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+// Import appropriate shadcn UI input components
+import { {actionName} } from '@/actions/{entity}-actions';
+
+// Define Zod schema matching server action schema
+const formSchema = z.object({
+  // Field definitions matching server action schema
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+interface {ComponentName}Props {
+  // Required props (e.g., entityId, existing values for edit)
+}
+
+export function {ComponentName}({ props }: {ComponentName}Props) {
+  const [open, setOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      // Empty for add, existing values for edit
+    },
+  });
+
+  // For edit components only: Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        // Current values
+      });
+    }
+  }, [open, /* current values */, form]);
+
+  const onSubmit = async (values: FormValues) => {
+    try {
+      setIsSubmitting(true);
+      await {actionName}({
+        // Pass validated values
+      });
+
+      // Reset form (for add) and close dialog on success
+      form.reset(); // Only for add components
+      setOpen(false);
+    } catch (error) {
+      console.error('Failed to {action}:', error);
+      // Error handling
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="..." size="...">
+          {/* Button text */}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[525px]">
+        <DialogHeader>
+          <DialogTitle>{Action Title}</DialogTitle>
+          <DialogDescription>
+            {/* Description */}
+          </DialogDescription>
+        </DialogHeader>
+        
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* FormFields for each input */}
+            
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? '{Action}ing...' : '{Action}'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+### ✅ Required Pattern - Server Actions
+
+**All mutations MUST be in [src/actions/](mdc:src/actions/) directory.**
+
+#### Server Action Structure Template
+
+```typescript
+'use server';
+
+import { auth } from '@clerk/nextjs/server';
+import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
+import { 
+  {actionName} as db{ActionName}
+} from '@/db/queries/{entity}';
+
+// Define Zod schema
+const {actionName}Schema = z.object({
+  // Field definitions with validation
+});
+
+type {ActionName}Input = z.infer<typeof {actionName}Schema>;
+
+export async function {actionName}(input: {ActionName}Input) {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // Validate input
+  const validatedInput = {actionName}Schema.parse(input);
+
+  // Call query helper
+  const result = await db{ActionName}({
+    userId,
+    ...validatedInput,
+  });
+
+  // Revalidate affected paths
+  revalidatePath(`/path/to/affected/page`);
+
+  return result;
+}
+```
+
+### ✅ Required Pattern - Query Helpers
+
+**All database operations MUST be in [src/db/queries/](mdc:src/db/queries/) directory.**
+
+Query helpers are already covered in [data-patterns.mdc](mdc:.cursor/rules/data-patterns.mdc), but must:
+- Accept `userId` as parameter (never call `auth()` directly)
+- Verify ownership before mutations
+- Return typed data
+- Update parent entity `updatedAt` when applicable
+
+## Examples
+
+### ✅ Correct - Add Component
+
+Reference: [src/app/decks/components/add-card-button.tsx](mdc:src/app/decks/components/add-card-button.tsx)
+
+### ✅ Correct - Edit Component
+
+Reference: [src/app/decks/components/edit-card-button.tsx](mdc:src/app/decks/components/edit-card-button.tsx)
+
+### ✅ Correct - Server Actions
+
+Reference: [src/actions/card-actions.ts](mdc:src/actions/card-actions.ts)
+
+## Component Usage
+
+**Action components MUST be used in display components, not embedded.**
+
+### ✅ Correct - Using Action Components
+
+```typescript
+import { AddCardButton } from './components/add-card-button';
+import { EditCardButton } from './components/edit-card-button';
+
+export function FlashcardList({ deckId, cards }) {
+  return (
+    <div>
+      <AddCardButton deckId={deckId} />
+      {cards.map(card => (
+        <div key={card.id}>
+          {/* Card display */}
+          <EditCardButton 
+            cardId={card.id} 
+            front={card.front} 
+            back={card.back} 
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### ❌ FORBIDDEN - Embedded Actions
+
+```typescript
+// ❌ FORBIDDEN - Embedding action logic in display component
+export function FlashcardCard({ card }) {
+  const [open, setOpen] = useState(false);
+  // ... form logic embedded here
+  return (
+    <Card>
+      {/* Card content */}
+      <Button onClick={() => setOpen(true)}>Edit</Button>
+      {/* Dialog embedded here */}
+    </Card>
+  );
+}
+```
+
+## Required Features
+
+### All Action Components MUST Have:
+
+1. ✅ **Client Component** - Marked with `'use client'`
+2. ✅ **Dialog Pattern** - Use shadcn UI Dialog component
+3. ✅ **Form Validation** - react-hook-form with zodResolver
+4. ✅ **Loading State** - `isSubmitting` state with disabled buttons
+5. ✅ **Error Handling** - try/catch with error logging
+6. ✅ **Zod Schema** - Matching server action schema
+7. ✅ **Type Safety** - TypeScript types inferred from Zod schemas
+8. ✅ **shadcn UI** - Only use shadcn UI components (Button, Dialog, Form, Input, Textarea, etc.)
+
+### Edit Components MUST Also Have:
+
+1. ✅ **useEffect Hook** - Reset form when dialog opens to show current values
+2. ✅ **Pre-filled Values** - Form defaultValues set to existing entity values
+3. ✅ **Props for Current Values** - Accept current entity data as props
+
+### Add Components MUST Also Have:
+
+1. ✅ **Empty Default Values** - Form starts empty
+2. ✅ **Form Reset on Success** - Reset form after successful submission
+
+## Delete Components
+
+Delete components may use a confirmation dialog instead of a form:
+
+```typescript
+'use client';
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { deleteCard } from '@/actions/card-actions';
+
+interface DeleteCardButtonProps {
+  cardId: number;
+  deckId: number;
+}
+
+export function DeleteCardButton({ cardId, deckId }: DeleteCardButtonProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    try {
+      setIsDeleting(true);
+      await deleteCard({ cardId, deckId });
+    } catch (error) {
+      console.error('Failed to delete card:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="destructive" size="sm">
+          Delete
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action cannot be undone. This will permanently delete this card.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            disabled={isDeleting}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+```
+
+## Quick Checklist
+
+Before creating any add/edit/delete functionality:
+
+### Component Checklist:
+1. ✓ Is it a separate component file?
+2. ✓ Does it follow the naming convention (`AddXButton`, `EditXButton`, `DeleteXButton`)?
+3. ✓ Is it marked with `'use client'`?
+4. ✓ Does it use shadcn UI components only?
+5. ✓ Does it use react-hook-form with zodResolver?
+6. ✓ Does it have proper loading states?
+7. ✓ Does it have error handling?
+8. ✓ Is it exported from the components `index.ts`?
+
+### Server Action Checklist:
+1. ✓ Is it in `src/actions/` directory?
+2. ✓ Is it marked with `'use server'`?
+3. ✓ Does it have Zod validation?
+4. ✓ Does it check authentication?
+5. ✓ Does it call a query helper from `db/queries/`?
+6. ✓ Does it revalidate affected paths?
+
+### Edit Component Specific:
+1. ✓ Does it have useEffect to reset form on dialog open?
+2. ✓ Does it accept current values as props?
+3. ✓ Are defaultValues set to existing entity values?
+
+### Add Component Specific:
+1. ✓ Are defaultValues empty?
+2. ✓ Does it reset form on successful submission?
+
+**If you answer "no" to any of these, the code structure is incorrect.**
