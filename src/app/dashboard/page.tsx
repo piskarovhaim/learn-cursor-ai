@@ -1,54 +1,33 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default async function DashboardPage() {
   const { userId } = await auth();
 
-  // Redirect to home if not authenticated (middleware will handle auth)
   if (!userId) {
     redirect("/");
   }
 
-  // Get user details
-  const user = await currentUser();
-
   return (
-    <div className="container mx-auto p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold mb-8">Dashboard</h1>
-        
-        <div className="bg-gray-800 rounded-lg p-6 mb-6">
-          <h2 className="text-2xl font-semibold mb-4">Welcome back!</h2>
-          <div className="space-y-2">
-            <p className="text-gray-300">
-              <span className="font-medium">Name:</span>{" "}
-              {user?.firstName} {user?.lastName}
-            </p>
-            <p className="text-gray-300">
-              <span className="font-medium">Email:</span>{" "}
-              {user?.emailAddresses[0]?.emailAddress}
-            </p>
-            <p className="text-gray-300">
-              <span className="font-medium">User ID:</span> {userId}
-            </p>
-          </div>
+    <div className="min-h-screen bg-white dark:bg-black">
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold tracking-tight text-black dark:text-white">
+            Dashboard
+          </h1>
+          <p className="mt-2 text-lg text-zinc-600 dark:text-zinc-400">
+            Welcome to your FlashyCardy dashboard
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-gray-800 rounded-lg p-6">
-            <h3 className="text-xl font-semibold mb-2">Protected Content</h3>
-            <p className="text-gray-400">
-              This page is only accessible to authenticated users.
+        <Card>
+          <CardContent className="p-8">
+            <p className="text-center text-zinc-600 dark:text-zinc-400">
+              Your flashcard decks will appear here
             </p>
-          </div>
-
-          <div className="bg-gray-800 rounded-lg p-6">
-            <h3 className="text-xl font-semibold mb-2">Account Status</h3>
-            <p className="text-gray-400">
-              Your account is active and verified.
-            </p>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -1,11 +1,29 @@
 ---
 alwaysApply: true
-description: Guidelines for using shadcn UI components in the project
+description: STRICT guidelines for using ONLY shadcn UI components in the project
 ---
 
 # shadcn UI Component Guidelines
 
-This project uses **shadcn UI** for all UI elements.
+## 🚨 CRITICAL RULES - MUST FOLLOW 🚨
+
+**This project uses EXCLUSIVELY shadcn UI components for ALL UI elements.**
+
+### ❌ ABSOLUTELY FORBIDDEN
+
+1. **NO custom UI components** - NEVER create custom buttons, inputs, cards, dialogs, or any other UI elements from scratch
+2. **NO custom styling for UI primitives** - Do not create styled divs that mimic buttons, inputs, or other UI components
+3. **NO third-party UI libraries** - Do not use Material-UI, Ant Design, Chakra UI, or any other UI library
+4. **NO unstyled HTML elements for UI** - Do not use raw `<button>`, `<input>`, `<select>`, etc. without shadcn UI wrappers
+5. **NO inline style objects for UI components** - Always use shadcn UI's built-in variants and className props
+
+### ✅ REQUIRED APPROACH
+
+**Before creating ANY UI element, you MUST:**
+1. Check if shadcn UI provides that component
+2. Install the shadcn UI component if not already installed
+3. Use the shadcn UI component with its built-in variants and props
+4. If you need customization, use shadcn UI's className prop with Tailwind classes
 
 ## Initialization
 
@@ -23,20 +41,179 @@ To install a specific component, use the following command format:
 npx shadcn@latest add <component-name>
 ```
 
-### Examples:
+### Common Components:
 - Button: `npx shadcn@latest add button`
 - Card: `npx shadcn@latest add card`
 - Dialog: `npx shadcn@latest add dialog`
 - Input: `npx shadcn@latest add input`
 - Form: `npx shadcn@latest add form`
+- Label: `npx shadcn@latest add label`
+- Select: `npx shadcn@latest add select`
+- Checkbox: `npx shadcn@latest add checkbox`
+- Radio Group: `npx shadcn@latest add radio-group`
+- Switch: `npx shadcn@latest add switch`
+- Textarea: `npx shadcn@latest add textarea`
+- Alert: `npx shadcn@latest add alert`
+- Badge: `npx shadcn@latest add badge`
+- Separator: `npx shadcn@latest add separator`
+- Skeleton: `npx shadcn@latest add skeleton`
+- Table: `npx shadcn@latest add table`
+- Tabs: `npx shadcn@latest add tabs`
+- Toast: `npx shadcn@latest add toast`
+- Tooltip: `npx shadcn@latest add tooltip`
 
-## Best Practices
-
-1. **Always use shadcn UI components** - Do not create custom UI components from scratch when shadcn UI provides an equivalent
-2. **Check if component exists** - Before creating any UI element, verify if shadcn UI has a pre-built component
-3. **Install before use** - Always ensure the required component is installed before importing it in your code
-4. **Follow shadcn conventions** - Use the components as documented in the shadcn UI documentation
+**See full list**: https://ui.shadcn.com/docs/components
 
 ## Component Location
 
-After installation, shadcn UI components are typically located in `src/components/ui/` directory.
+After installation, shadcn UI components are located in `src/components/ui/` directory.
+
+## Clerk Integration with shadcn UI
+
+**All Clerk authentication UI MUST use shadcn UI components.**
+
+### ✅ Correct Pattern - Clerk with shadcn UI Button and Dialog
+
+```typescript
+'use client';
+
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { SignIn, SignUp } from '@clerk/nextjs';
+
+export function AuthButtons() {
+  return (
+    <div className="flex gap-2">
+      {/* Sign In with Modal */}
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="default">Sign In</Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sign In</DialogTitle>
+            <DialogDescription>
+              Sign in to your account to continue
+            </DialogDescription>
+          </DialogHeader>
+          <SignIn routing="virtual" />
+        </DialogContent>
+      </Dialog>
+
+      {/* Sign Up with Modal */}
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="outline">Sign Up</Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Account</DialogTitle>
+            <DialogDescription>
+              Create a new account to get started
+            </DialogDescription>
+          </DialogHeader>
+          <SignUp routing="virtual" />
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+```
+
+### ❌ WRONG - Do NOT create custom buttons for Clerk
+
+```typescript
+// ❌ FORBIDDEN - Custom button styling
+<button 
+  onClick={() => setShowSignIn(true)}
+  className="px-4 py-2 bg-blue-500 text-white rounded"
+>
+  Sign In
+</button>
+
+// ❌ FORBIDDEN - Using Clerk's built-in buttons instead of shadcn UI
+<SignInButton mode="modal">
+  <button>Sign in</button>
+</SignInButton>
+
+// ❌ FORBIDDEN - Redirecting to separate pages instead of using modals
+<a href="/sign-in">Sign In</a>
+```
+
+### Required Setup for Clerk Modals
+
+1. Install Dialog component: `npx shadcn@latest add dialog`
+2. Install Button component: `npx shadcn@latest add button`
+3. Use `routing="virtual"` prop on `<SignIn>` and `<SignUp>` components
+4. Wrap Clerk components in shadcn UI `<Dialog>` component
+5. Use shadcn UI `<Button>` as the `<DialogTrigger>`
+
+## Examples
+
+### ✅ Correct - Using shadcn UI Components
+
+```typescript
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+
+export function MyForm() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Create Deck</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="name">Name</Label>
+            <Input id="name" placeholder="Enter deck name" />
+          </div>
+          <Button type="submit">Create</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+### ❌ WRONG - Creating Custom UI
+
+```typescript
+// ❌ FORBIDDEN - Custom button
+<button className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+  Click me
+</button>
+
+// ❌ FORBIDDEN - Custom input
+<input 
+  className="border border-gray-300 rounded px-3 py-2"
+  placeholder="Enter text"
+/>
+
+// ❌ FORBIDDEN - Custom card
+<div className="border rounded-lg p-4 shadow-md">
+  <h2 className="text-xl font-bold">Title</h2>
+  <p>Content</p>
+</div>
+```
+
+## Enforcement Checklist
+
+Before writing ANY UI code, verify:
+
+1. ✓ Am I using a shadcn UI component?
+2. ✓ Have I installed the required shadcn UI component?
+3. ✓ Am I NOT creating any custom buttons, inputs, or other UI primitives?
+4. ✓ If using Clerk, am I using shadcn UI Button and Dialog components?
+5. ✓ Am I NOT using raw HTML elements for interactive UI?
+
+**If you answer "no" to any of these, STOP and use shadcn UI instead.**
